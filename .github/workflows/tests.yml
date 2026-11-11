@@ -1,0 +1,29 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12", "3.13"]
+    name: linux-64 / py${{ matrix.python }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install ymf with mesh facets and provenance, then this package
+        # proteustoolkit/ymf main has them (cekees/ymf#6, merged upstream).
+        run: |
+          python -m pip install --upgrade pip
+          pip install "ymf @ git+https://github.com/proteustoolkit/ymf@main"
+          pip install ".[test]"
+      - name: Run the tests
+        # The proteus cross-checks skip here (no proteus); they run where proteus is installed.
+        run: python -m pytest tests -q -rs -p no:cacheprovider

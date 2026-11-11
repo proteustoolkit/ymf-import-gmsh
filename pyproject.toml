@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ymf-import-gmsh"
+dynamic = ["version"]
+description = "Convert gmsh .msh meshes (MSH 2.2 and 4.x) to ymf meshes."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "cekees" }]
+# ymf with mesh facets, provenance and quadratic-cell edge orders (proteustoolkit/ymf main).
+dependencies = ["ymf", "numpy", "h5py"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+ymf-import-gmsh = "ymf_import_gmsh.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "ymf_import_gmsh.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
