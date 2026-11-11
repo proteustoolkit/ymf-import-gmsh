@@ -2,7 +2,7 @@ name: tests
 
 on:
   push:
-    branches: [main, round4]
+    branches: [main, pinned-reference]
   pull_request:
 
 jobs:
