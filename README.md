@@ -27,14 +27,17 @@ hexahedra, prisms, ...) are refused by name.
 | highest-dimension elements | `elements`; `Triangle`/`Tri_6` or `Tetrahedron`/`Tet_10` |
 | a cell's first physical group | `elementMaterialTypes` (0: none) |
 | tagged segments (2D) or triangles (3D) | `facets` + `facetTags` (an element in no physical group is not a facet) |
-| physical points, else tagged boundary faces (3D), else tagged segments | `nodeMaterialTypes`, as proteus's `msh2simplex` |
+| physical points, else tagged boundary faces (3D), else tagged segments | `nodeMaterialTypes`, as proteus's removed `msh2simplex` did |
 | second-order edge nodes | reordered to ymf's edge order (gmsh's `Tet_10` swaps the last two) |
 | file name and SHA-256 | `provenance` |
 
 ## Acceptance
 
-Where proteus is installed (and `tetgen` for 3D), `tests/test_convert.py` reads each fixture through
-`msh2simplex` and proteus's triangle/tetgen readers and through the converted ymf mesh: nodes, cells,
-node, cell and boundary tags are bit-equal. CI runs without proteus; those tests skip.
+`tests/fixtures/gmsh_{square,cube}_reference.npz` are the seven mesh arrays proteus's former in-tree path
+(`msh2simplex`, tetgen `-Vfeen` in 3D, the triangle/tetgen readers) built from `gmsh_square.msh` and
+`gmsh_cube.msh`, generated at proteustoolkit/proteus `bf846a47`, the parent of the commit that removed
+`msh2simplex` (C7.1 round 5). The converted nodes, cells and material tags are compared to them bit-equal in
+every run, with no proteus; where proteus is installed, `TriangularMesh`/`TetrahedralMesh.generateFromYmfFile`
+is compared on all seven arrays, boundary topology and tags included.
 
 Fixtures and how they were made: `tests/fixtures/README.md`.

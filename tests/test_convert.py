@@ -1,10 +1,9 @@
 """gmsh meshes to ymf meshes: checked against the files, against each other across MSH formats,
-and, where proteus is installed, against proteus's in-tree path (``msh2simplex`` and the
-triangle/tetgen readers): the acceptance test of C7.1 round 4."""
+and against the arrays proteus's former in-tree path (``msh2simplex``, removed in C7.1 round 5)
+built, pinned in ``fixtures/*_reference.npz``."""
 
 import os
 import shutil
-import subprocess
 
 import numpy as np
 import pytest
@@ -203,51 +202,45 @@ def test_the_command_line(tmp_path, capsys):
 
 
 # --------------------------------------------------------------------------
-# acceptance: the same mesh as proteus's in-tree path (skipped without proteus)
+# acceptance: the mesh proteus's former in-tree path built, pinned (C7.1 round 5)
 # --------------------------------------------------------------------------
+# tests/fixtures/gmsh_{square,cube}_reference.npz hold the seven arrays that proteus's msh2simplex,
+# tetgen -Vfeen (3D) and the triangle/tetgen readers built from gmsh_square.msh and gmsh_cube.msh,
+# generated at bf846a47 (cekees/main before the removal, proteustoolkit/proteus#1354), the parent of
+# the commit that removed msh2simplex. Nodes, cells and the two tag arrays are compared here with no
+# proteus; the three boundary arrays need proteus's topology and are compared where it is installed.
 
-
-@pytest.fixture(scope="module")
-def proteus_meshtools():
-    MeshTools = pytest.importorskip("proteus.MeshTools")
-    from proteus import Comm
-    Comm.init()
-    return MeshTools
-
-
-def _in_tree(MeshTools, filebase, nd):
-    """The in-tree path of a use_gmsh domain: msh2simplex, tetgen (3D), the triangle/tetgen reader."""
-    MeshTools.msh2simplex(filebase, nd=nd)
-    if nd == 2:
-        mesh = MeshTools.TriangularMesh()
-        mesh.generateFromTriangleFiles(filebase, 1)
-        return mesh
-    tetgen = shutil.which("tetgen")
-    if tetgen is None:
-        pytest.skip("no tetgen")
-    subprocess.run([tetgen, "-Vfeen", filebase + ".ele"], check=True, capture_output=True)
-    for ext in ("ele", "node", "face"):
-        os.replace("%s.1.%s" % (filebase, ext), "%s.%s" % (filebase, ext))
-    mesh = MeshTools.TetrahedralMesh()
-    mesh.generateFromTetgenFiles(filebase, 1)
-    return mesh
-
-
-ACCEPTANCE = [("gmsh_square", 2), ("gmsh_cube", 3), ("square2_o1.msh2", 2), ("cube_o1.msh2", 3)]
+ACCEPTANCE = [("gmsh_square", 2), ("gmsh_cube", 3)]
 MESH_ARRAYS = ("nodeArray", "elementNodesArray", "elementMaterialTypes", "nodeMaterialTypes",
                "elementBoundaryNodesArray", "exteriorElementBoundariesArray",
                "elementBoundaryMaterialTypes")
 
 
+def _reference(name):
+    return dict(np.load(os.path.join(FIXTURES, name + "_reference.npz")))
+
+
 @pytest.mark.parametrize("name, nd", ACCEPTANCE)
-def test_proteus_reads_the_mesh_msh2simplex_reads(tmp_path, monkeypatch, proteus_meshtools, name, nd):
-    """The round 4 acceptance: through the ymf mesh, the mesh msh2simplex and the triangle/tetgen
-    reader build (nodes, cells, material and boundary tags), bit-equal."""
+def test_the_converted_mesh_is_the_pinned_reference(tmp_path, name, nd):
+    """Always runs: nodes, cells, material and node tags, bit-equal to the removed in-tree path's."""
+    ref = _reference(name)
+    _, mesh = _read(convert(_copy(tmp_path, name)))
+    np.testing.assert_array_equal(mesh["nodes"], ref["nodeArray"])
+    np.testing.assert_array_equal(mesh["elements"], ref["elementNodesArray"])
+    np.testing.assert_array_equal(mesh["elementMaterialTypes"], ref["elementMaterialTypes"])
+    np.testing.assert_array_equal(mesh["nodeMaterialTypes"], ref["nodeMaterialTypes"])
+
+
+@pytest.mark.parametrize("name, nd", ACCEPTANCE)
+def test_proteus_reads_the_pinned_reference_mesh(tmp_path, monkeypatch, name, nd):
+    """Where proteus is installed: all seven arrays, boundary topology and tags included."""
+    MeshTools = pytest.importorskip("proteus.MeshTools")
+    from proteus import Comm
+    Comm.init()
     monkeypatch.chdir(tmp_path)
-    filebase = _copy(tmp_path, name)
-    prefix = convert(filebase, str(tmp_path / "converted"))
-    via_ymf = (proteus_meshtools.TriangularMesh if nd == 2 else proteus_meshtools.TetrahedralMesh)()
-    via_ymf.generateFromYmfFile(prefix)
-    in_tree = _in_tree(proteus_meshtools, filebase, nd)
+    prefix = convert(_copy(tmp_path, name))
+    mesh = (MeshTools.TriangularMesh if nd == 2 else MeshTools.TetrahedralMesh)()
+    mesh.generateFromYmfFile(prefix)
+    ref = _reference(name)
     for key in MESH_ARRAYS:
-        np.testing.assert_array_equal(getattr(via_ymf, key), getattr(in_tree, key), err_msg=key)
+        np.testing.assert_array_equal(getattr(mesh, key), ref[key], err_msg=key)
